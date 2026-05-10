@@ -1,0 +1,25 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.14.37216.2 d17.14
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PCC_App", "PCC_App.csproj", "{2180A55F-3ACD-4AF8-BEE6-EA05FF6A55D7}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{2180A55F-3ACD-4AF8-BEE6-EA05FF6A55D7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2180A55F-3ACD-4AF8-BEE6-EA05FF6A55D7}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2180A55F-3ACD-4AF8-BEE6-EA05FF6A55D7}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2180A55F-3ACD-4AF8-BEE6-EA05FF6A55D7}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {5C5069AE-24BB-408A-8C4E-C803F96C9E4C}
+	EndGlobalSection
+EndGlobal
