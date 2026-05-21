@@ -99,11 +99,6 @@ namespace PCC_App.UI
                 panelSearchResult.Visible = false;
             }
         }
-
-        private void lblFullname_Click(object sender, EventArgs e)
-        {
-
-        }
         // 💰 ИЗМЕНЕНИЕ БАЛАНСА РУКАМИ
         private void btnUpdateBalance_Click(object sender, EventArgs e)
         {
@@ -131,11 +126,6 @@ namespace PCC_App.UI
 
                 btnRefreshSessions_Click(null, null); // Обновляем список
             }
-        }
-
-        private void dgvActiveSessions_CellContentClick(object sender, DataGridViewCellEventArgs e)
-        {
-
         }
 
         private void linkToLogout_LinkClicked(object sender, LinkLabelLinkClickedEventArgs e)
