@@ -206,21 +206,6 @@ namespace PCC_App
             }
         }
 
-        private void label2_Click(object sender, EventArgs e)
-        {
-
-        }
-
-        private void label9_Click(object sender, EventArgs e)
-        {
-
-        }
-
-        private void CabinetForm_Load_1(object sender, EventArgs e)
-        {
-
-        }
-
         private void linkTopUp_LinkClicked(object sender, LinkLabelLinkClickedEventArgs e)
         {
             if (panelTopUp.Visible)
@@ -240,55 +225,7 @@ namespace PCC_App
             new AuthForm().Show();
             this.Close();  // потом закрываем текущее
         }
-        private void lblNickname_Click(object sender, EventArgs e)
-        {
-
-        }
-
-        private void label13_Click(object sender, EventArgs e)
-        {
-
-        }
-
-        private void label5_Click(object sender, EventArgs e)
-        {
-
-        }
-
-        private void label6_Click(object sender, EventArgs e)
-        {
-
-        }
-
-        private void label7_Click(object sender, EventArgs e)
-        {
-
-        }
-
-        private void label8_Click(object sender, EventArgs e)
-        {
-
-        }
-
-        private void panelMain_Paint(object sender, PaintEventArgs e)
-        {
-
-        }
-
-        private void label11_Click(object sender, EventArgs e)
-        {
-
-        }
-
-        private void label12_Click(object sender, EventArgs e)
-        {
-
-        }
-
-        private void txtTotalPrice_TextChanged(object sender, EventArgs e)
-        {
-
-        }
+       
     }
 }
 
