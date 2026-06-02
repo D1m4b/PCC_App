@@ -1,5 +1,6 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
+using System.Data;
 using Npgsql;
 using PCC_App.BusinessLogic;
 
@@ -227,6 +228,31 @@ namespace PCC_App.DataAccess
                 }
             }
             return computers;
+        }
+
+        public DataTable GetComputersWithSessions(int hallId)
+        {
+            DataTable dt = new DataTable();
+            using (NpgsqlConnection conn = new NpgsqlConnection(_connectionString))
+            {
+                conn.Open();
+                // Джойним компы и сессии, которые еще идут (end_time > сейчас)
+                string sql = @"SELECT c.id, c.pc_number, c.status, s.end_time 
+                       FROM computers c 
+                       LEFT JOIN sessions s ON c.id = s.computer_id AND s.end_time > CURRENT_TIMESTAMP
+                       WHERE c.hall_id = @hid
+                       ORDER BY c.pc_number";
+
+                using (NpgsqlCommand cmd = new NpgsqlCommand(sql, conn))
+                {
+                    cmd.Parameters.AddWithValue("@hid", hallId);
+                    using (NpgsqlDataAdapter da = new NpgsqlDataAdapter(cmd))
+                    {
+                        da.Fill(dt); // Загружаем всё в табличку
+                    }
+                }
+            }
+            return dt;
         }
 
         public void UpdateComputerStatus(int computerId, ComputerStatus newStatus)
