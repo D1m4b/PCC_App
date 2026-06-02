@@ -1,11 +1,12 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
+using System.Data;
 using System.Linq;
 using System.Windows.Forms;
-using PCC_App.BusinessLogic;
-using PCC_App.DataAccess;
 using PCC_App;
 using PCC_App.BusinessLogic;
+using PCC_App.BusinessLogic;
+using PCC_App.DataAccess;
 
 namespace PCC_App
 {
@@ -102,25 +103,44 @@ namespace PCC_App
 
         private void cmbHalls_SelectedIndexChanged(object sender, EventArgs e)
         {
-            if (cmbHalls.SelectedIndex == -1) return;
+            if (cmbHalls.SelectedValue == null || !(cmbHalls.SelectedValue is int)) return;
+            int hallId = (int)cmbHalls.SelectedValue;
 
-            int selectedHallId = (int)cmbHalls.SelectedValue;
+            // Вызываем наш новый метод (прокинь его через слой _logic, если нужно)
+            DataTable dt = _logic.GetComputersWithSessions(hallId);
 
-            // Свободные ПК
-            var freePcs = _logic.GetFreePcsByHall(selectedHallId);
-            cmbComputers.DataSource = freePcs;
-            cmbComputers.DisplayMember = "PcNumber";  // просто номер ПК
+            var comboItems = new List<object>();
+
+            foreach (DataRow row in dt.Rows)
+            {
+                int id = Convert.ToInt32(row["id"]);
+                int number = Convert.ToInt32(row["pc_number"]);
+                string status = row["status"].ToString();
+
+                string displayText = $"ПК №{number} (Свободен)";
+
+                // Если статус занят и есть время в базе
+                if (status == "Занят" && row["end_time"] != DBNull.Value)
+                {
+                    DateTime endTime = Convert.ToDateTime(row["end_time"]);
+                    displayText = $"ПК №{number} (Занят до {endTime:HH:mm})";
+                }
+                else if (status == "В ремонте")
+                {
+                    displayText = $"ПК №{number} (В ремонте)";
+                }
+
+                // Кладем во временный объект для комбобокса
+                comboItems.Add(new { Id = id, Display = displayText, Status = status });
+            }
+
+            cmbComputers.DataSource = comboItems;
             cmbComputers.ValueMember = "Id";
+            cmbComputers.DisplayMember = "Display";
 
-            // Тарифы
-            var tariffs = _logic.GetTariffsByHall(selectedHallId);
-            cmbTariffs.DataSource = tariffs;
-            cmbTariffs.DisplayMember = "DisplayName";
+            cmbTariffs.DataSource = _logic.GetTariffsByHall(hallId);
             cmbTariffs.ValueMember = "Id";
-
-            // Очищаем выбор часов и цену
-            cmbHours.DataSource = null;
-            txtTotalPrice.Text = "";
+            cmbTariffs.DisplayMember = "Name";
         }
         private void cmbTariffs_SelectedIndexChanged(object sender, EventArgs e)
         {
@@ -171,7 +191,7 @@ namespace PCC_App
 
         private void btnBook_Click(object sender, EventArgs e)
         {
-            // Проверка заполненности
+            // 1. СНАЧАЛА ПРОВЕРЯЕМ ЗАПОЛНЕННОСТЬ (чтобы не ловить вылеты)
             if (cmbHalls.SelectedIndex == -1 ||
                 cmbComputers.SelectedIndex == -1 ||
                 cmbTariffs.SelectedIndex == -1 ||
@@ -181,28 +201,37 @@ namespace PCC_App
                 return;
             }
 
+            // 2. ТЕПЕРЬ ПРОВЕРЯЕМ СТАТУС ПК (прямо из выбранного элемента списка)
+            dynamic selectedPc = cmbComputers.SelectedItem;
+            string pcStatus = selectedPc.Status;
+
+            if (pcStatus == "Занят")
+            {
+                MessageBox.Show("Этот компьютер занят, выберите другой или подождите.");
+                return;
+            }
+            if (pcStatus == "В ремонте")
+            {
+                MessageBox.Show("Компьютер сломан или находится в ремонте.");
+                return;
+            }
+
+            // 3. ЕСЛИ ВСЁ ОК — ВЫТАСКИВАЕМ ID ДЛЯ БАЗЫ ДАННЫХ
             int hallId = (int)cmbHalls.SelectedValue;
             int computerId = (int)cmbComputers.SelectedValue;
             int tariffId = (int)cmbTariffs.SelectedValue;
             int hours = (int)cmbHours.SelectedItem;
 
-            // Дополнительная проверка — вдруг компьютер заняли в эту же секунду
-            var freePcs = _logic.GetFreePcsByHall(hallId);
-            if (freePcs.All(c => c.Id != computerId))
-            {
-                MessageBox.Show("Этот компьютер уже занят или в ремонте. Выберите другой.");
-                cmbHalls_SelectedIndexChanged(null, null); // обновим список
-                return;
-            }
-
+            // 4.ОТПРАВЛЯЕМ ЗАПРОС НА БРОНИРОВАНИЕ
             var result = _logic.BookComputer(_currentUserId, computerId, tariffId, hours);
             MessageBox.Show(result.message);
 
+            // 5. ОБНОВЛЯЕМ ИНТЕРФЕЙС ПРИ УСПЕХЕ
             if (result.success)
             {
-                RefreshUserData();                   // обновит баланс на форме
-                cmbHalls_SelectedIndexChanged(null, null); // перезагрузит ПК (уберет занятый)
-                LoadSessionHistory();                       // обновит таблицу сессий
+                RefreshUserData();                           // Обновит баланс на форме
+                cmbHalls_SelectedIndexChanged(null, null);   // Перезагрузит ПК (теперь этот ПК станет "Занят до...") и тарифы
+                LoadSessionHistory();                        // Обновит таблицу сессий внизу
             }
         }
 
@@ -225,7 +254,6 @@ namespace PCC_App
             new AuthForm().Show();
             this.Close();  // потом закрываем текущее
         }
-       
     }
 }
 
