@@ -1,5 +1,6 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
+using System.Data;
 using System.Linq;
 using PCC_App.DataAccess;
 
@@ -148,6 +149,12 @@ namespace PCC_App.BusinessLogic
         public List<Computer> GetFreePcsByHall(int hallId)
         {
             return _db.GetFreeComputersByHall(hallId);
+        }
+
+        public DataTable GetComputersWithSessions(int hallId)
+        {
+            // Просто перенаправляем запрос в базу данных
+            return _db.GetComputersWithSessions(hallId);
         }
 
         public List<Tariff> GetTariffsByHall(int hallId)
