@@ -89,7 +89,7 @@ namespace PCC_App.BusinessLogic
             return _db.GetUserSessions(userId);
         }
 
-        public (bool success, string message) BookComputer(int userId, int computerId, int tariffId, int hours)
+        public (bool success, string message) BookComputer(int userId, int computerId, int tariffId, int hours, DateTime bookingStart)
         {
             var user = _db.GetUserById(userId);
             if (user == null) return (false, "Пользователь не найден");
@@ -102,8 +102,15 @@ namespace PCC_App.BusinessLogic
                 return (false, $"Недостаточно средств. Требуется {cost}, у вас {user.Balance}");
 
             _db.UpdateBalance(userId, -cost);
-            _db.CreateSession(userId, computerId, tariffId, hours, cost);
-            _db.UpdateComputerStatus(computerId, ComputerStatus.Занят);
+
+            // Передаем выбранное время старта брони в базу данных
+            _db.CreateSession(userId, computerId, tariffId, hours, cost, bookingStart);
+
+            // МЕНЯЕМ СТАТУС ТОЛЬКО ЕСЛИ СЕССИЯ НАЧИНАЕТСЯ СЕЙЧАС (например, в ближайшие 10 минут)
+            if (bookingStart <= DateTime.Now.AddMinutes(10))
+            {
+                _db.UpdateComputerStatus(computerId, ComputerStatus.Занят);
+            }
 
             return (true, $"Бронь на {hours} ч. оформлена. Списано {cost} руб.");
         }
@@ -160,6 +167,12 @@ namespace PCC_App.BusinessLogic
         public List<Tariff> GetTariffsByHall(int hallId)
         {
             return _db.GetTariffsByHall(hallId);
+        }
+
+        public DataTable GetComputersByTimeInterval(int hallId, DateTime reqStart, int hours)
+        {
+            DateTime reqEnd = reqStart.AddHours(hours);
+            return _db.GetComputersByTimeInterval(hallId, reqStart, reqEnd);
         }
     }
 }
