@@ -270,7 +270,7 @@ namespace PCC_App.DataAccess
             }
         }
 
-        public void CreateSession(int userId, int computerId, int tariffId, int hours, int totalCost)
+        public void CreateSession(int userId, int computerId, int tariffId, int hours, int totalCost, DateTime startTime)
         {
             using (NpgsqlConnection conn = new NpgsqlConnection(_connectionString))
             {
@@ -281,8 +281,11 @@ namespace PCC_App.DataAccess
                     cmd.Parameters.AddWithValue("@uid", userId);
                     cmd.Parameters.AddWithValue("@cid", computerId);
                     cmd.Parameters.AddWithValue("@tid", tariffId);
-                    cmd.Parameters.AddWithValue("@start", DateTime.Now);
-                    cmd.Parameters.AddWithValue("@end", DateTime.Now.AddHours(hours));
+
+                    // ИСПОЛЬЗУЕМ ВРЕМЯ, КОТОРОЕ ВЫБРАЛ ПОЛЬЗОВАТЕЛЬ:
+                    cmd.Parameters.AddWithValue("@start", startTime);
+                    cmd.Parameters.AddWithValue("@end", startTime.AddHours(hours));
+
                     cmd.Parameters.AddWithValue("@cost", totalCost);
                     cmd.ExecuteNonQuery();
                 }
@@ -405,6 +408,39 @@ namespace PCC_App.DataAccess
                 }
             }
             return halls;
+        }
+
+        public DataTable GetComputersByTimeInterval(int hallId, DateTime reqStart, DateTime reqEnd)
+        {
+            DataTable dt = new DataTable();
+            using (NpgsqlConnection conn = new NpgsqlConnection(_connectionString))
+            {
+                conn.Open();
+
+                // Используем подзапросы, чтобы гарантировать ровно 1 строку на каждый ПК (без дубликатов из-за LEFT JOIN)
+                string sql = @"
+            SELECT c.id, c.pc_number, c.status,
+                   (SELECT s.start_time FROM sessions s 
+                    WHERE s.computer_id = c.id AND s.start_time < @req_end AND s.end_time > @req_start LIMIT 1) as conflict_start,
+                   (SELECT s.end_time FROM sessions s 
+                    WHERE s.computer_id = c.id AND s.start_time < @req_end AND s.end_time > @req_start LIMIT 1) as conflict_end
+            FROM computers c
+            WHERE c.hall_id = @hid
+            ORDER BY c.pc_number";
+
+                using (NpgsqlCommand cmd = new NpgsqlCommand(sql, conn))
+                {
+                    cmd.Parameters.AddWithValue("@hid", hallId);
+                    cmd.Parameters.AddWithValue("@req_start", reqStart);
+                    cmd.Parameters.AddWithValue("@req_end", reqEnd);
+
+                    using (NpgsqlDataAdapter da = new NpgsqlDataAdapter(cmd))
+                    {
+                        da.Fill(dt);
+                    }
+                }
+            }
+            return dt;
         }
     }
 }
