@@ -100,48 +100,6 @@ namespace PCC_App
         {
 
         }
-
-        private void cmbHalls_SelectedIndexChanged(object sender, EventArgs e)
-        {
-            if (cmbHalls.SelectedValue == null || !(cmbHalls.SelectedValue is int)) return;
-            int hallId = (int)cmbHalls.SelectedValue;
-
-            // Вызываем наш новый метод (прокинь его через слой _logic, если нужно)
-            DataTable dt = _logic.GetComputersWithSessions(hallId);
-
-            var comboItems = new List<object>();
-
-            foreach (DataRow row in dt.Rows)
-            {
-                int id = Convert.ToInt32(row["id"]);
-                int number = Convert.ToInt32(row["pc_number"]);
-                string status = row["status"].ToString();
-
-                string displayText = $"ПК №{number} (Свободен)";
-
-                // Если статус занят и есть время в базе
-                if (status == "Занят" && row["end_time"] != DBNull.Value)
-                {
-                    DateTime endTime = Convert.ToDateTime(row["end_time"]);
-                    displayText = $"ПК №{number} (Занят до {endTime:HH:mm})";
-                }
-                else if (status == "В ремонте")
-                {
-                    displayText = $"ПК №{number} (В ремонте)";
-                }
-
-                // Кладем во временный объект для комбобокса
-                comboItems.Add(new { Id = id, Display = displayText, Status = status });
-            }
-
-            cmbComputers.DataSource = comboItems;
-            cmbComputers.ValueMember = "Id";
-            cmbComputers.DisplayMember = "Display";
-
-            cmbTariffs.DataSource = _logic.GetTariffsByHall(hallId);
-            cmbTariffs.ValueMember = "Id";
-            cmbTariffs.DisplayMember = "Name";
-        }
         private void cmbTariffs_SelectedIndexChanged(object sender, EventArgs e)
         {
             if (cmbTariffs.SelectedItem is Tariff tariff)
@@ -163,6 +121,7 @@ namespace PCC_App
         private void cmbHours_SelectedIndexChanged(object sender, EventArgs e)
         {
             UpdateTotalPrice();
+            RefreshAvailableComputers();
         }
         private void UpdateTotalPrice()
         {
@@ -189,7 +148,7 @@ namespace PCC_App
             cmbHalls.SelectedIndex = -1; // Чтобы по умолчанию ничего не было выбрано
         }
 
-        private void btnBook_Click(object sender, EventArgs e)
+        /*(private void btnBook_Click(object sender, EventArgs e)
         {
             // 1. СНАЧАЛА ПРОВЕРЯЕМ ЗАПОЛНЕННОСТЬ (чтобы не ловить вылеты)
             if (cmbHalls.SelectedIndex == -1 ||
@@ -233,8 +192,61 @@ namespace PCC_App
                 cmbHalls_SelectedIndexChanged(null, null);   // Перезагрузит ПК (теперь этот ПК станет "Занят до...") и тарифы
                 LoadSessionHistory();                        // Обновит таблицу сессий внизу
             }
-        }
+        }*/
+        private void btnBook_Click(object sender, EventArgs e)
+        {
+            if (cmbHalls.SelectedIndex == -1 ||
+                cmbComputers.SelectedIndex == -1 ||
+                cmbTariffs.SelectedIndex == -1 ||
+                cmbHours.SelectedIndex == -1)
+            {
+                MessageBox.Show("Заполните все поля бронирования.");
+                return;
+            }
 
+            dynamic selectedPc = cmbComputers.SelectedItem;
+            string pcStatus = selectedPc.Status;
+
+            if (pcStatus == "Занят")
+            {
+                MessageBox.Show("Этот компьютер занят на выбранный вами интервал времени!");
+                return;
+            }
+            if (pcStatus == "В ремонте")
+            {
+                MessageBox.Show("Компьютер в ремонте.");
+                return;
+            }
+
+            int computerId = (int)cmbComputers.SelectedValue;
+            int tariffId = (int)cmbTariffs.SelectedValue;
+            int hours = Convert.ToInt32(cmbHours.SelectedItem);
+
+            // --- ОПЯТЬ СКЛЕИВАЕМ ДАТУ И ВРЕМЯ ДЛЯ БАЗЫ ---
+            DateTime selectedDate = dtpBookingDate.Value.Date;
+            DateTime selectedTime = dtpBookingTime.Value;
+            DateTime bookingStart = new DateTime(
+                selectedDate.Year, selectedDate.Month, selectedDate.Day,
+                selectedTime.Hour, selectedTime.Minute, 0
+            );
+            // Защита: нельзя бронировать в прошлом
+            if (bookingStart < DateTime.Now.AddMinutes(-5))
+            {
+                MessageBox.Show("Нельзя забронировать компьютер на прошедшее время!");
+                return;
+            }
+
+            // Передаем дату в метод бизнес-логики (нужно будет добавить параметр bookingStart в твой метод!)
+            var result = _logic.BookComputer(_currentUserId, computerId, tariffId, hours, bookingStart);
+            MessageBox.Show(result.message);
+
+            if (result.success)
+            {
+                RefreshUserData();
+                RefreshAvailableComputers(); // Обновит список с учетом только что созданной брони
+                LoadSessionHistory();
+            }
+        }
         private void linkTopUp_LinkClicked(object sender, LinkLabelLinkClickedEventArgs e)
         {
             if (panelTopUp.Visible)
@@ -254,6 +266,88 @@ namespace PCC_App
             new AuthForm().Show();
             this.Close();  // потом закрываем текущее
         }
+
+        // 1. Создаем универсальный метод обновления данных на форме
+        private void RefreshAvailableComputers()
+        {
+            if (cmbHalls.SelectedValue == null || !(cmbHalls.SelectedValue is int)) return;
+            if (cmbHours.SelectedItem == null) return;
+
+            int hallId = (int)cmbHalls.SelectedValue;
+
+            // --- ВОТ ТУТ СКЛЕИВАЕМ ДАТУ И ВРЕМЯ ---
+            DateTime selectedDate = dtpBookingDate.Value.Date; // Берем только день
+            DateTime selectedTime = dtpBookingTime.Value;      // Берем время
+
+            // Создаем итоговую дату со временем
+            DateTime reqStart = new DateTime(
+                selectedDate.Year, selectedDate.Month, selectedDate.Day,
+                selectedTime.Hour, selectedTime.Minute, 0
+            );
+            int hours = Convert.ToInt32(cmbHours.SelectedItem);
+
+            DataTable dt = _logic.GetComputersByTimeInterval(hallId, reqStart, hours);
+            var comboItems = new List<object>();
+
+            foreach (DataRow row in dt.Rows)
+            {
+                int id = Convert.ToInt32(row["id"]);
+                int number = Convert.ToInt32(row["pc_number"]);
+                string dbStatus = row["status"].ToString(); // общий статус из таблицы компьютеров (например, В ремонте)
+
+                string displayText = $"ПК №{number} (Свободен)";
+                string calculatedStatus = "Свободен";
+
+                // Если подзапрос нашел пересечение броней в этот интервал
+                if (row["conflict_start"] != DBNull.Value)
+                {
+                    DateTime confStart = Convert.ToDateTime(row["conflict_start"]);
+                    DateTime confEnd = Convert.ToDateTime(row["conflict_end"]);
+
+                    displayText = $"ПК №{number} (Занят с {confStart:dd.MM HH:mm} до {confEnd:HH:mm})";
+                    calculatedStatus = "Занят";
+                }
+                else if (dbStatus == "В ремонте")
+                {
+                    displayText = $"ПК №{number} (В ремонте)";
+                    calculatedStatus = "В ремонте";
+                }
+
+                comboItems.Add(new { Id = id, Display = displayText, Status = calculatedStatus });
+            }
+
+            // Перепривязываем ComboBox компьютеров
+            cmbComputers.DataSource = comboItems;
+            cmbComputers.ValueMember = "Id";
+            cmbComputers.DisplayMember = "Display";
+        }
+
+        // 2. Теперь подвязываем этот метод к событиям формы:
+        private void cmbHalls_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            RefreshAvailableComputers();
+
+            // Не забываем загрузку тарифов, которую мы чинили в прошлый раз!
+            if (cmbHalls.SelectedValue is int hallId)
+            {
+                cmbTariffs.DataSource = _logic.GetTariffsByHall(hallId);
+                cmbTariffs.ValueMember = "Id";
+                cmbTariffs.DisplayMember = "Name";
+            }
+        }
+
+
+        private void dtpBookingTime_ValueChanged(object sender, EventArgs e)
+        {
+            RefreshAvailableComputers();
+        }
+
+        private void dtpBookingDate_ValueChanged(object sender, EventArgs e)
+        {
+            RefreshAvailableComputers();
+        }
+
+
     }
 }
 
